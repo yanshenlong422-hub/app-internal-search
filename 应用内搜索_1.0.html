@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>应用内搜索</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        // 配置Tailwind自定义颜色和深色模式
+        tailwind.config = {
+            darkMode: 'class', // 启用类模式的深色模式
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#1E40AF',
+                        accent1: '#10B981', // 绿色
+                        accent2: '#EF4444', // 红色
+                        accent3: '#F59E0B', // 橙色
+                        accent4: '#8B5CF6', // 紫色
+                        accent5: '#EC4899', // 粉色
+                        accent6: '#06B6D4', // 青色
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .bg-glass {
+                background: rgba(255, 255, 255, 0.8);
+                backdrop-filter: blur(8px);
+            }
+            .bg-glass-dark {
+                background: rgba(31, 41, 55, 0.8);
+                backdrop-filter: blur(8px);
+            }
+            .search-input-focus {
+                @apply border-primary ring-2 ring-primary/20;
+            }
+            .select-wrapper-focus {
+                @apply border-primary ring-2 ring-primary/20;
+            }
+        }
+    </style>
+    <style>
+        /* 抖动动画 */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        .animate-shake {
+            animation: shake 0.6s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        
+        /* 网页版链接提示框 */
+        .web-fallback-modal {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(150%);
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            padding: 16px;
+            z-index: 60;
+            max-width: 90%;
+            width: 300px;
+            transition: transform 0.3s ease;
+        }
+        .dark .web-fallback-modal {
+            background: #1f2937;
+        }
+        .web-fallback-modal.show {
+            transform: translateX(-50%) translateY(0);
+        }
+        
+        /* 全局过渡动画 */
+        * {
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
+    <!-- 顶部导航栏 -->
+    <header class="sticky top-0 z-40 bg-glass border-b border-gray-200 dark:border-gray-800">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-md shadow-primary/20">
+                    <i class="fa fa-search text-white"></i>
+                </div>
+                <h1 class="text-xl font-bold">应用内搜索</h1>
+            </div>
+            <button id="theme-toggle" class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="切换夜间模式">
+                <i class="fa fa-moon-o dark:hidden transition-transform duration-300"></i>
+                <i class="fa fa-sun-o hidden dark:inline-block transition-transform duration-300"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="container mx-auto px-4 py-8 max-w-md">
+        <!-- 搜索区域 -->
+        <div class="mb-6 transform transition-all duration-500 hover:scale-[1.01]">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border border-gray-100 dark:border-gray-700 transition-all duration-300 hover:shadow-lg">
+                <!-- 搜索输入 -->
+                <div class="mb-4">
+                    <label for="search-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">搜索内容</label>
+                    <div class="relative">
+                        <div class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 transition-colors duration-300 group-hover:text-primary">
+                            <i class="fa fa-search"></i>
+                        </div>
+                        <input 
+                            type="text" 
+                            id="search-input" 
+                            placeholder="输入关键词..." 
+                            class="w-full pl-10 pr-10 py-3 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:outline-none transition-all duration-300"
+                        >
+                        <button id="clear-input" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hidden transition-colors duration-300">
+                            <i class="fa fa-times-circle"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 应用选择下拉框 -->
+                <div class="mb-5">
+                    <label for="engine-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">选择应用</label>
+                    <div class="relative select-wrapper group">
+                        <select 
+                            id="engine-select" 
+                            class="w-full appearance-none pl-4 pr-12 py-3 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:outline-none transition-all duration-300 bg-transparent"
+                        >
+                            <!-- 选项将通过JavaScript动态填充 -->
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500 transition-colors duration-300 group-hover:text-primary">
+                            <i class="fa fa-chevron-down transition-transform duration-300" id="select-arrow"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 搜索按钮 -->
+                <button 
+                    id="search-btn" 
+                    class="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-95 text-white font-medium py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 active:scale-98 shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30"
+                >
+                    <i class="fa fa-search"></i>
+                    <span>搜索</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 常用应用快捷方式 -->
+        <div>
+            <h2 class="text-base font-semibold mb-3.5 flex items-center">
+                <i class="fa fa-star text-primary mr-2"></i>
+                常用应用
+            </h2>
+            <div id="quick-engines" class="grid grid-cols-4 gap-3">
+                <!-- 快捷方式将通过JavaScript动态填充 -->
+            </div>
+        </div>
+
+        <!-- 设置按钮 -->
+        <button id="settings-btn" class="fixed bottom-6 right-6 w-12 h-12 rounded-full bg-primary text-white shadow-lg flex items-center justify-center hover:bg-secondary transition-all duration-300 hover:scale-110">
+            <i class="fa fa-cog"></i>
+        </button>
+    </main>
+
+    <!-- 设置面板 -->
+    <div id="settings-panel" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg w-full max-w-md max-h-[85vh] overflow-y-auto transition-all duration-300 transform scale-95 opacity-0" id="settings-content">
+            <div class="p-5 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center sticky top-0 bg-white dark:bg-gray-800 z-10">
+                <h2 class="text-lg font-bold">设置</h2>
+                <button id="close-settings" class="w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="p-5 space-y-6">
+                <!-- 添加自定义应用 -->
+                <div>
+                    <h3 class="text-base font-semibold mb-3 flex items-center">
+                        <i class="fa fa-plus-circle text-primary mr-2"></i>
+                        添加应用
+                    </h3>
+                    <form id="add-engine-form" class="space-y-3">
+                        <div>
+                            <label for="engine-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">应用名称</label>
+                            <input type="text" id="engine-name" required class="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:outline-none transition-all duration-300 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label for="engine-url" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">搜索链接 (使用 {query} 作为关键词占位符)</label>
+                            <input type="text" id="engine-url" required placeholder="例如: taobao://s.taobao.com?q={query}" class="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:outline-none transition-all duration-300 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <button type="submit" class="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-95 text-white font-medium py-2.5 px-4 rounded-lg transition-all">
+                            添加应用
+                        </button>
+                    </form>
+                </div>
+
+                <!-- 管理应用 -->
+                <div>
+                    <h3 class="text-base font-semibold mb-3 flex items-center">
+                        <i class="fa fa-list text-primary mr-2"></i>
+                        管理应用
+                    </h3>
+                    <div id="engine-list" class="space-y-2 max-h-60 overflow-y-auto pr-2">
+                        <!-- 应用列表将通过JavaScript动态填充 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 通知提示 -->
+    <div id="notification" class="fixed bottom-5 right-5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-4 py-2.5 rounded-lg shadow-md transform translate-y-20 opacity-0 transition-all duration-300 z-50 flex items-center gap-2">
+        <i class="fa fa-info-circle text-primary"></i>
+        <span id="notification-text">通知内容</span>
+    </div>
+
+    <!-- 网页版备选链接提示框 -->
+    <div class="web-fallback-modal" id="webFallbackModal">
+        <p class="text-sm mb-3">无法打开应用，是否访问网页版？</p>
+        <div class="flex gap-2">
+            <button id="webFallbackCancel" class="flex-1 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                取消
+            </button>
+            <button id="webFallbackConfirm" class="flex-1 py-2 bg-primary text-white rounded-lg text-sm hover:bg-secondary transition-colors">
+                访问网页版
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 应用内搜索URL Scheme列表
+        const defaultEngines = [
+            { name: "美团", url: "imeituan://www.meituan.com/search?q={query}", webUrl: "https://www.meituan.com/search?q={query}" },
+            { name: "美团外卖", url: "meituanwaimai://waimai.meituan.com/search?query={query}", webUrl: "https://waimai.meituan.com/search?query={query}" },
+            { name: "大众点评", url: "dianping://searchshoplist?keyword={query}", webUrl: "https://www.dianping.com/search/keyword/{query}" },
+            { name: "淘宝", url: "taobao://s.taobao.com?q={query}", webUrl: "https://s.taobao.com/search?q={query}" },
+            { name: "天猫", url: "tmall://page.tm/search?q={query}", webUrl: "https://list.tmall.com/search_product.htm?q={query}" },
+            { name: "京东", url: "openapp.jdmobile://virtual?params={\"des\":\"productList\",\"keyWord\":\"{query}\",\"from\":\"search\",\"category\":\"jump\"}", webUrl: "https://search.jd.com/Search?keyword={query}" },
+            { name: "拼多多", url: "pinduoduo://yangkeduo.com/search_result.html?search_key={query}", webUrl: "https://mobile.yangkeduo.com/search_result.html?search_key={query}" },
+            { name: "小红书", url: "xhsdiscover://search/result?keyword={query}", webUrl: "https://www.xiaohongshu.com/search_result?keyword={query}" }
+        ];
+
+        // 可用的图标和颜色列表 - 用于随机分配
+        const availableIcons = [
+            'fa-shopping-bag', 'fa-cutlery', 'fa-shopping-cart', 'fa-home', 
+            'fa-film', 'fa-music', 'fa-book', 'fa-plane', 'fa-car', 
+            'fa-coffee', 'fa-heart', 'fa-gamepad', 'fa-newspaper-o',
+            'fa-video-camera', 'fa-picture-o', 'fa-comment', 'fa-map-marker'
+        ];
+        
+        const availableColors = [
+            'primary', 'secondary', 'accent1', 'accent2', 
+            'accent3', 'accent4', 'accent5', 'accent6'
+        ];
+
+        // DOM元素
+        const searchInput = document.getElementById('search-input');
+        const clearInputBtn = document.getElementById('clear-input');
+        const engineSelect = document.getElementById('engine-select');
+        const selectArrow = document.getElementById('select-arrow');
+        const selectWrapper = document.querySelector('.select-wrapper');
+        const searchBtn = document.getElementById('search-btn');
+        const quickEnginesContainer = document.getElementById('quick-engines');
+        const settingsBtn = document.getElementById('settings-btn');
+        const closeSettingsBtn = document.getElementById('close-settings');
+        const settingsPanel = document.getElementById('settings-panel');
+        const settingsContent = document.getElementById('settings-content');
+        const addEngineForm = document.getElementById('add-engine-form');
+        const engineList = document.getElementById('engine-list');
+        const themeToggle = document.getElementById('theme-toggle');
+        const notification = document.getElementById('notification');
+        const notificationText = document.getElementById('notification-text');
+        const webFallbackModal = document.getElementById('webFallbackModal');
+        const webFallbackCancel = document.getElementById('webFallbackCancel');
+        const webFallbackConfirm = document.getElementById('webFallbackConfirm');
+        
+        // 当前网页版链接
+        let currentWebUrl = '';
+        // 存储每个应用的图标和颜色，确保刷新后保持一致
+        let appIcons = JSON.parse(localStorage.getItem('appIcons') || '{}');
+
+        // 初始化应用
+        function initApp() {
+            // 强制检查并应用深色模式
+            applyDarkMode();
+            
+            // 加载应用列表
+            loadEngines();
+            
+            // 设置事件监听
+            setupEventListeners();
+            
+            // 下拉框交互效果
+            setupSelectEffects();
+            
+            // 网页版备选链接事件
+            setupWebFallbackEvents();
+        }
+
+        // 强制应用深色模式
+        function applyDarkMode() {
+            const isDark = localStorage.getItem('darkMode') === 'true';
+            if (isDark) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+            updateDarkModeUI(isDark);
+        }
+
+        // 下拉框交互效果
+        function setupSelectEffects() {
+            // 聚焦时箭头旋转和边框效果
+            engineSelect.addEventListener('focus', () => {
+                selectArrow.classList.add('rotate-180');
+                selectWrapper.classList.add('select-wrapper-focus');
+            });
+            
+            // 失焦时恢复原状
+            engineSelect.addEventListener('blur', () => {
+                selectArrow.classList.remove('rotate-180');
+                selectWrapper.classList.remove('select-wrapper-focus');
+            });
+            
+            // 搜索框聚焦效果
+            searchInput.addEventListener('focus', () => {
+                searchInput.classList.add('search-input-focus');
+            });
+            
+            searchInput.addEventListener('blur', () => {
+                searchInput.classList.remove('search-input-focus');
+            });
+        }
+
+        // 网页版备选链接事件
+        function setupWebFallbackEvents() {
+            webFallbackCancel.addEventListener('click', () => {
+                webFallbackModal.classList.remove('show');
+            });
+            
+            webFallbackConfirm.addEventListener('click', () => {
+                if (currentWebUrl) {
+                    window.open(currentWebUrl, '_blank');
+                    webFallbackModal.classList.remove('show');
+                }
+            });
+        }
+
+        // 获取或生成应用的图标和颜色
+        function getAppIconAndColor(appName) {
+            // 如果已有保存的图标和颜色，直接使用
+            if (appIcons[appName]) {
+                return appIcons[appName];
+            }
+            
+            // 随机选择图标和颜色
+            const randomIcon = availableIcons[Math.floor(Math.random() * availableIcons.length)];
+            const randomColor = availableColors[Math.floor(Math.random() * availableColors.length)];
+            
+            // 保存到本地存储
+            appIcons[appName] = { icon: randomIcon, color: randomColor };
+            localStorage.setItem('appIcons', JSON.stringify(appIcons));
+            
+            return { icon: randomIcon, color: randomColor };
+        }
+
+        // 加载应用列表
+        function loadEngines() {
+            const savedEngines = localStorage.getItem('searchEngines');
+            const engines = savedEngines ? JSON.parse(savedEngines) : defaultEngines;
+            
+            // 更新下拉选择框
+            updateEngineSelect(engines);
+            
+            // 更新快捷应用
+            updateQuickEngines(engines.slice(0, 8));
+            
+            // 更新应用管理列表
+            updateEngineList(engines);
+        }
+
+        // 更新下拉选择框
+        function updateEngineSelect(engines) {
+            engineSelect.innerHTML = '';
+            
+            engines.forEach(engine => {
+                const option = document.createElement('option');
+                option.value = engine.url;
+                option.textContent = engine.name;
+                // 存储网页版链接作为数据属性
+                option.dataset.webUrl = engine.webUrl || '';
+                engineSelect.appendChild(option);
+            });
+        }
+
+        // 更新快捷应用 - 使用随机图标和颜色
+        function updateQuickEngines(engines) {
+            quickEnginesContainer.innerHTML = '';
+            
+            engines.forEach(engine => {
+                // 获取应用的图标和颜色
+                const { icon, color } = getAppIconAndColor(engine.name);
+                
+                const engineBtn = document.createElement('button');
+                engineBtn.className = 'flex flex-col items-center justify-center p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-' + color + ' hover:bg-' + color + '/5 transition-all duration-300 hover:shadow-md';
+                engineBtn.innerHTML = `
+                    <div class="w-10 h-10 rounded-full bg-${color}/10 flex items-center justify-center text-${color} mb-1.5 transition-transform duration-300 hover:scale-110">
+                        <i class="fa ${icon}"></i>
+                    </div>
+                    <span class="text-xs text-center truncate">${engine.name}</span>
+                `;
+                engineBtn.addEventListener('click', () => {
+                    engineSelect.value = engine.url;
+                    searchInput.focus();
+                    
+                    // 点击反馈动画
+                    engineBtn.classList.add('scale-95');
+                    setTimeout(() => engineBtn.classList.remove('scale-95'), 200);
+                });
+                quickEnginesContainer.appendChild(engineBtn);
+            });
+        }
+
+        // 更新应用管理列表
+        function updateEngineList(engines) {
+            engineList.innerHTML = '';
+            
+            if (engines.length === 0) {
+                engineList.innerHTML = '<div class="text-gray-500 dark:text-gray-400 text-sm italic py-3">暂无应用</div>';
+                return;
+            }
+            
+            engines.forEach((engine, index) => {
+                // 获取应用的图标和颜色
+                const { icon, color } = getAppIconAndColor(engine.name);
+                
+                const engineItem = document.createElement('div');
+                engineItem.className = 'bg-gray-50 dark:bg-gray-700 rounded-lg p-3 flex justify-between items-center hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-300';
+                engineItem.innerHTML = `
+                    <div class="flex items-center gap-3 flex-1 min-w-0">
+                        <div class="w-8 h-8 rounded-full bg-${color}/10 flex items-center justify-center text-${color} flex-shrink-0">
+                            <i class="fa ${icon}"></i>
+                        </div>
+                        <div>
+                            <div class="font-medium truncate">${engine.name}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">${engine.url}</div>
+                        </div>
+                    </div>
+                    <button class="delete-engine text-gray-400 hover:text-red-500 p-1.5 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors duration-300" data-index="${index}">
+                        <i class="fa fa-trash-o"></i>
+                    </button>
+                `;
+                engineList.appendChild(engineItem);
+            });
+            
+            // 删除应用事件
+            document.querySelectorAll('.delete-engine').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const index = parseInt(e.currentTarget.dataset.index);
+                    const engineName = engineList.children[index].querySelector('.font-medium').textContent;
+                    
+                    // 删除应用时同时删除其图标配置
+                    if (appIcons[engineName]) {
+                        delete appIcons[engineName];
+                        localStorage.setItem('appIcons', JSON.stringify(appIcons));
+                    }
+                    
+                    deleteEngine(index);
+                });
+            });
+        }
+
+        // 添加新应用
+        function addEngine(name, url) {
+            const savedEngines = localStorage.getItem('searchEngines');
+            const engines = savedEngines ? JSON.parse(savedEngines) : defaultEngines;
+            
+            // 检查是否已存在
+            const exists = engines.some(engine => engine.name.toLowerCase() === name.toLowerCase() && engine.url === url);
+            if (exists) {
+                showNotification(`已存在相同的应用配置`);
+                return false;
+            }
+            
+            // 检查URL格式
+            if (!url.includes('{query}')) {
+                showNotification('链接必须包含{query}作为关键词占位符');
+                return false;
+            }
+            
+            // 为新应用生成图标和颜色
+            getAppIconAndColor(name);
+            
+            // 默认添加网页版链接为空
+            engines.push({ name, url, webUrl: '' });
+            localStorage.setItem('searchEngines', JSON.stringify(engines));
+            
+            // 更新界面
+            updateEngineSelect(engines);
+            updateQuickEngines(engines.slice(0, 8));
+            updateEngineList(engines);
+            
+            showNotification(`已添加应用: ${name}`);
+            return true;
+        }
+
+        // 删除应用
+        function deleteEngine(index) {
+            const savedEngines = localStorage.getItem('searchEngines');
+            if (!savedEngines) return;
+            
+            const engines = JSON.parse(savedEngines);
+            const deletedEngine = engines.splice(index, 1)[0];
+            
+            localStorage.setItem('searchEngines', JSON.stringify(engines));
+            
+            // 更新界面
+            updateEngineSelect(engines);
+            updateQuickEngines(engines.slice(0, 8));
+            updateEngineList(engines);
+            
+            showNotification(`已删除应用: ${deletedEngine.name}`);
+        }
+
+        // 执行搜索 - 带完整跳转处理
+        function performSearch() {
+            const query = searchInput.value.trim();
+            const engineUrl = engineSelect.value;
+            const selectedOption = engineSelect.options[engineSelect.selectedIndex];
+            const appName = selectedOption.text;
+            const webUrlTemplate = selectedOption.dataset.webUrl;
+            
+            if (!query) {
+                showNotification('请输入搜索内容');
+                // 抖动动画效果
+                searchInput.classList.add('ring-2', 'ring-red-200', 'animate-shake');
+                setTimeout(() => {
+                    searchInput.classList.remove('ring-2', 'ring-red-200', 'animate-shake');
+                }, 600);
+                searchInput.focus();
+                return;
+            }
+            
+            if (!engineUrl) {
+                showNotification('请选择应用');
+                // 抖动动画效果
+                selectWrapper.classList.add('ring-2', 'ring-red-200', 'animate-shake');
+                setTimeout(() => {
+                    selectWrapper.classList.remove('ring-2', 'ring-red-200', 'animate-shake');
+                }, 600);
+                return;
+            }
+            
+            // 替换URL中的占位符
+            const searchUrl = engineUrl.replace(/{query}/g, encodeURIComponent(query));
+            // 准备网页版链接
+            currentWebUrl = webUrlTemplate ? webUrlTemplate.replace(/{query}/g, encodeURIComponent(query)) : '';
+            
+            // 显示通知
+            showNotification(`正在尝试打开${appName}...`);
+            
+            // 记录跳转开始时间用于检测是否成功
+            const startTime = Date.now();
+            
+            // 尝试跳转应用
+            if (typeof plus !== 'undefined') {
+                // 适用于HBuilderX打包的App环境
+                plus.runtime.openURL(searchUrl, function(res) {
+                    if (res) {
+                        showNotification(`无法打开${appName}，请检查是否已安装`);
+                        // 如果有网页版链接，显示备选方案
+                        if (currentWebUrl) {
+                            setTimeout(() => {
+                                webFallbackModal.classList.add('show');
+                            }, 1000);
+                        }
+                    }
+                });
+            } else if (navigator.userAgent.match(/(iPhone|iPod|iPad|Android)/)) {
+                // 移动浏览器环境
+                try {
+                    // 创建隐藏的iframe尝试触发跳转
+                    const iframe = document.createElement('iframe');
+                    iframe.style.display = 'none';
+                    iframe.src = searchUrl;
+                    document.body.appendChild(iframe);
+                    
+                    // 3秒后检查是否跳转成功
+                    setTimeout(() => {
+                        document.body.removeChild(iframe);
+                        
+                        // 判断是否跳转成功（通过检测页面是否可见）
+                        if (document.visibilityState === 'visible' && Date.now() - startTime > 1500) {
+                            showNotification(`无法打开${appName}，请检查是否已安装`);
+                            // 如果有网页版链接，显示备选方案
+                            if (currentWebUrl) {
+                                webFallbackModal.classList.add('show');
+                            }
+                        }
+                    }, 3000);
+                } catch (e) {
+                    showNotification(`打开${appName}失败: ${e.message}`);
+                    // 如果有网页版链接，显示备选方案
+                    if (currentWebUrl) {
+                        setTimeout(() => {
+                            webFallbackModal.classList.add('show');
+                        }, 1000);
+                    }
+                }
+            } else {
+                // 桌面浏览器环境
+                showNotification('此功能在桌面浏览器中可能无法正常工作');
+                console.log('跳转链接:', searchUrl);
+                // 如果有网页版链接，显示备选方案
+                if (currentWebUrl) {
+                    setTimeout(() => {
+                        webFallbackModal.classList.add('show');
+                    }, 1000);
+                }
+            }
+        }
+
+        // 切换夜间模式 - 全局生效
+        function toggleDarkMode() {
+            const isDark = !document.documentElement.classList.contains('dark');
+            localStorage.setItem('darkMode', isDark);
+            applyDarkMode();
+            
+            // 主题切换动画
+            const themeIcon = themeToggle.querySelector('i');
+            themeIcon.classList.add('rotate-180');
+            setTimeout(() => {
+                themeIcon.classList.remove('rotate-180');
+            }, 300);
+        }
+
+        // 更新深色模式UI
+        function updateDarkModeUI(isDark) {
+            const header = document.querySelector('header');
+            if (isDark) {
+                header.classList.remove('bg-glass', 'border-gray-200');
+                header.classList.add('bg-glass-dark', 'border-gray-800');
+            } else {
+                header.classList.remove('bg-glass-dark', 'border-gray-800');
+                header.classList.add('bg-glass', 'border-gray-200');
+            }
+        }
+
+        // 显示通知
+        function showNotification(message) {
+            notificationText.textContent = message;
+            notification.classList.remove('translate-y-20', 'opacity-0');
+            notification.classList.add('translate-y-0', 'opacity-100');
+            
+            setTimeout(() => {
+                notification.classList.remove('translate-y-0', 'opacity-100');
+                notification.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // 打开设置面板
+        function openSettings() {
+            settingsPanel.classList.remove('hidden');
+            setTimeout(() => {
+                settingsContent.classList.remove('scale-95', 'opacity-0');
+                settingsContent.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        // 关闭设置面板
+        function closeSettings() {
+            settingsContent.classList.remove('scale-100', 'opacity-100');
+            settingsContent.classList.add('scale-95', 'opacity-0');
+            
+            setTimeout(() => {
+                settingsPanel.classList.add('hidden');
+            }, 300);
+        }
+
+        // 设置事件监听
+        function setupEventListeners() {
+            // 搜索按钮点击
+            searchBtn.addEventListener('click', performSearch);
+            
+            // 回车键搜索
+            searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    performSearch();
+                }
+            });
+            
+            // 清除输入框
+            clearInputBtn.addEventListener('click', () => {
+                searchInput.value = '';
+                clearInputBtn.classList.add('hidden');
+            });
+            
+            // 输入框内容变化
+            searchInput.addEventListener('input', () => {
+                if (searchInput.value.trim()) {
+                    clearInputBtn.classList.remove('hidden');
+                } else {
+                    clearInputBtn.classList.add('hidden');
+                }
+            });
+            
+            // 主题切换
+            themeToggle.addEventListener('click', toggleDarkMode);
+            
+            // 设置面板
+            settingsBtn.addEventListener('click', openSettings);
+            closeSettingsBtn.addEventListener('click', closeSettings);
+            settingsPanel.addEventListener('click', (e) => {
+                if (e.target === settingsPanel) {
+                    closeSettings();
+                }
+            });
+            
+            // 添加应用表单提交
+            addEngineForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const name = document.getElementById('engine-name').value.trim();
+                const url = document.getElementById('engine-url').value.trim();
+                
+                if (name && url) {
+                    if (addEngine(name, url)) {
+                        addEngineForm.reset();
+                    }
+                }
+            });
+        }
+
+        // 初始化应用
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
+    
