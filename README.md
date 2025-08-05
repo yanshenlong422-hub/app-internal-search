@@ -1,9 +1,11 @@
 # 应用内搜索工具
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/04b84b0f-d641-45b1-8185-bc6bfaa78ee7" alt="LibreTV Logo" width="120">
+</div>
 
 一个轻量级多应用快速搜索解决方案，通过URL Scheme协议直接调用各类应用执行搜索操作，支持自定义应用添加和主题切换。
 
-![应用内搜索工具预览](https://picsum.photos/800/400?random=1)
-*应用界面预览（示意图）*
+
 
 ## 功能特性
 
