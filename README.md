@@ -43,7 +43,7 @@
 | Instagram | `instagram://tag?name={query}` |
 | 爱奇艺 | `iqiyi://mobile/search?keyword={query}` |
 
-> 完整应用列表可在项目描述中查看，所有模板均使用`{query}`作为搜索关键词占位符
+>所有模板均使用`{query}`作为搜索关键词占位符,如果需要获取更多应用的URL Scheme，你可以通过查阅网上公开资料等方式自行寻找。如果你有更好的或更全的方案，非常欢迎分享补充！
 
 ## 使用方法
 
