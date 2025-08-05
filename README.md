@@ -25,9 +25,21 @@
 | 天猫 | `tmall://page.tm/search?q={query}` |
 | 京东 | `openapp.jdmobile://virtual?params={"des":"productList","keyWord":"{query}","from":"search","category":"jump"}` |
 | 小红书 | `xhsdiscover://search/result?keyword={query}` |
-| 哔哩哔哩 | `bilibili://search?keyword={query}` |
+| 夸克搜索 | `qklink://www.uc.cn/b20b84fd735a8dd3f7541129bacc4e9a?src_pkg=app_widget_card&src_ch=external&action=search&word={query}` |
+| 悟空搜索 | `snssdk6589://search?keyword={query}` |
+| 拼多多 | `pinduoduo://com.xunmeng.pinduoduo/search_result.html?search_key={query}` |
+| 软件商店 | `market://search?q={query}` |
+| 哔哩哔哩（B站） | `bilibili://search?keyword={query}` |
+| 酷安 | `coolmarket://com.coolapk.market/search?keyword={query}` |
 | 抖音 | `snssdk1128://search/result?keyword={query}` |
 | 淘宝 | `taobao://s.taobao.com/search?q={query}` |
+| 快手极速版 | `ksnebula://search?keyword={query}` |
+| 微博 | `sinaweibo://searchall?q={query}` |
+| 什么值得买 | `smzdm://search?json={"channelName":"home","search_type":"1","keyWord":"{query}"}` |
+| X | `twitter://search?query={query}` |
+| youtube | `youtube://results?search_query={query}` |
+| Instagram | `instagram://tag?name={query}` |
+| 爱奇艺 | `iqiyi://mobile/search?keyword={query}` |
 
 > 完整应用列表可在项目描述中查看，所有模板均使用`{query}`作为搜索关键词占位符
 
@@ -64,7 +76,7 @@
 
 1. 克隆本仓库：
    ```bash
-   git clone https://github.com/你的用户名/app-internal-search.git
+   git clone https://github.com/yanshenlong422-hub/app-internal-search.git
    ```
 
 2. 进入项目目录：
