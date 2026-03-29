@@ -34,7 +34,7 @@
 | 哔哩哔哩（B站） | `bilibili://search?keyword={query}` |
 | 酷安 | `coolmarket://com.coolapk.market/search?keyword={query}` |
 | 抖音 | `snssdk1128://search/result?keyword={query}` |
-| 淘宝 | `taobao://s.taobao.com/search?q={query}` |
+| 淘宝 | `tbopen://m.taobao.com/tbopen/index.html?h5Url=s.m.taobao.com/h5?q={{%s}}` |
 | 快手极速版 | `ksnebula://search?keyword={query}` |
 | 微博 | `sinaweibo://searchall?q={query}` |
 | 什么值得买 | `smzdm://search?json={"channelName":"home","search_type":"1","keyWord":"{query}"}` |
